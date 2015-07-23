@@ -1,0 +1,101 @@
+---
+title: "Course project for 'Practical machine learning'"
+output: html_document
+---
+
+## Assignment
+
+Participants are asked to perform 5 different activities. Their movements are measured using accelerometers. Also see http://groupware.les.inf.puc-rio.br/har.
+
+The project assignment is to predict the activity based on the movement data.
+
+## Data processing
+
+Load the dplyr and caret packages:
+
+```{r, results='hide', message=FALSE, warning=FALSE}
+library(dplyr)
+library(caret)
+library(randomForest)
+```
+
+Load the training data:
+
+```{r, cache=TRUE}
+download.file('https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv', 'pml-training.csv', method='curl')
+
+data <- read.csv("pml-training.csv", na.strings=c("NA",""))
+```
+
+The data consists of movement data, the outcome (column 'classe') and extra data like the timestamp and the name of the participant. We only want predictors and outcome data, so we remove the rest:
+
+```{r}
+data <- select(data, - c(X, user_name, raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp, new_window, num_window))
+```
+
+```{r, echo=FALSE}
+column_count = ncol(data)
+```
+
+Some columns have a lot of empty values. Remove the columns that have a percentage of empty values of 90% and more:
+
+```{r}
+data <- data[, colMeans(is.na(data)) < 0.1]
+```
+
+This reduces the column count from `r column_count` to `r ncol(data)` columns.
+
+Split the data into a training (60%) and a validation (40%) set:
+
+```{r}
+training_indexes <- createDataPartition(data$classe, p=0.6, list=FALSE)
+training <- data[training_indexes,]
+validation <- data[-training_indexes,]
+```
+
+## Model training
+
+Train a model using the random forest method.
+
+* The outcome variable is `classe`. All other variables are the predictors.
+* Do a cross-validation using k-fold with k=5.
+* Turn on `proximity` option.
+
+```{r}
+model <- train(classe ~ ., method="rf", trControl=trainControl(method="cv", number=5), prox=TRUE, data=training)
+```
+
+Some information about the model and the accuracy:
+
+```{r}
+print(model)
+```
+
+## Validation
+
+Validate the model with the validation data:
+
+```{r}
+predictions <- predict(model, validation)
+
+print(confusionMatrix(predictions, validation$classe))
+```
+
+## Prediction of the test set
+
+Load the test data:
+
+```{r, CACHE=TRUE}
+download.file('https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv', 'pml-testing.csv', method='curl')
+test_data <- read.csv('pml-testing.csv', na.strings=c("NA",""))
+```
+
+Predict:
+
+```{r}
+predictions <- predict(model, test_data)
+```
+
+I submitted these predictions to coursera, and they are all correct.
+
+Note that the results are not included in this document.
